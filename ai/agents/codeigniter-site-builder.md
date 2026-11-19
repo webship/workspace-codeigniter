@@ -96,7 +96,7 @@ accounts with `bash cmd-tools-codeigniter-spark.sh <name> --add-users` instead.
 | What you see | What it is |
 | --- | --- |
 | `composer create-project codeigniter4/appstarter failed` | No network in the container, or a package registry that did not answer: build again once it does. |
-| `Table 'db.users' doesn't exist` | The build ran without `--install`: `bash cmd-tools-codeigniter-spark.sh <name> --run "migrate --all"`. |
+| `Table 'db.settings' doesn't exist` (or another table of the auth library), HTTP 500 on the home page and the login page | The build ran without `--install`, so the auth library has no tables yet: `bash cmd-tools-codeigniter-spark.sh <name> --run "migrate --all"`. |
 | `The app has no auth library` | The app was built without `--shield`: build it again with it (the builder starts from nothing). |
 | The "Whoops!" page where the debug page was expected | The app runs in production: `bash cmd-tools-codeigniter-spark.sh <name> --environment development` for a moment, and back. |
 | `The action you requested is not allowed.` after sending a form | CSRF protection refused a form with an out-of-date token: open the page again and send it from there. |
