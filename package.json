@@ -1,0 +1,97 @@
+{
+  "name": "@webship.co/workspace-codeigniter",
+  "version": "1.0.0",
+  "description": "CodeIgniter for Webship Workspace: the builder (`cmd-codeigniter-project.sh`, the official app starter, with the official auth library on request) and the spark tool in every sites folder, the default accounts, the CodeIgniter step pack wired into the testing setup, and its AI items in their folders: two agents, a skill, a command and two prompts.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webship/workspace-codeigniter.git"
+  },
+  "files": [
+    "dist/src",
+    "ai",
+    "commands",
+    "features",
+    "scripts",
+    "testing",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "workspacePlugin": {
+    "name": "codeigniter",
+    "label": "CodeIgniter",
+    "needs": [
+      [
+        "dev",
+        "test",
+        "sandboxes",
+        "demos"
+      ],
+      "ai-agents",
+      "ai-skills",
+      "ai-commands",
+      "ai-prompts"
+    ],
+    "commands": {
+      "types": [
+        "sites"
+      ],
+      "workspaces": [
+        "dev",
+        "test",
+        "sandboxes",
+        "demos"
+      ],
+      "files": [
+        "commands/cmd-codeigniter-project.sh",
+        "commands/cmd-tools-codeigniter-spark.sh"
+      ]
+    },
+    "scripts": {
+      "functions": [
+        "scripts/functions/fun-codeigniter.sh"
+      ],
+      "args": [
+        "scripts/args/arg-codeigniter.sh",
+        "scripts/args/arg-codeigniter-spark.sh"
+      ],
+      "machine": [
+        "testing/site.feature"
+      ]
+    },
+    "ai": {
+      "agents": [
+        "ai/agents/codeigniter-site-builder.md",
+        "ai/agents/codeigniter-tester.md"
+      ],
+      "skills": [
+        "ai/skills/codeigniter-scenarios"
+      ],
+      "commands": [
+        "ai/commands/codeigniter-test.md"
+      ],
+      "prompts": [
+        "ai/prompts/codeigniter-build-and-test.md",
+        "ai/prompts/codeigniter-scenarios-for-a-group.md"
+      ]
+    },
+    "features": [
+      "features/codeigniter.feature"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@webship.co/workspace-plugin-api": "^1.0.11",
+    "typescript": "^5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
