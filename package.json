@@ -83,8 +83,10 @@
       ]
     },
     "features": [
-      "features/codeigniter.feature"
-    ]
+      "features/codeigniter.feature",
+      "features/codeigniter-runtimes.feature"
+    ],
+    "featuresSite": "cmd-codeigniter-project.sh ci-codeigniter --shield --install --add-users --runtime docker"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

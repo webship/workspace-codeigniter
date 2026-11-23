@@ -71,6 +71,7 @@ Everything the builder runs for an app runs in the app's own container, through 
 | `ai/prompts/codeigniter-build-and-test.md`, `codeigniter-scenarios-for-a-group.md` | Two prompts: whole launch commands for a new session |
 | `src/index.ts` | `register(api)`: what the assistant is told about CodeIgniter here |
 | `features/codeigniter.feature` | Scenarios for the dashboard's own browser suite |
+| `features/codeigniter-runtimes.feature` | The row, the test users and the pages of an app built on Docker Compose and on Kubernetes |
 
 The `workspacePlugin` block in `package.json` is the manifest the installer reads.
 
@@ -82,12 +83,12 @@ only this:
 | | WordPress (the reference) | CodeIgniter |
 | --- | --- | --- |
 | Project | `--project-type=wordpress` | `--project-type=php --docroot=public`: the app starter serves from `public/` |
-| Recognised by | The DDEV project type | Its files: the framework's `spark` script and `app/Config/Paths.php` |
+| Recognised by | The DDEV project type | Its files: the framework's `spark` script and `app/Config/Paths.php`; on another runtime than DDEV, the plugin's claim on the project |
 | Database | The container tool's default, settings written by the tool | The container tool's default (MariaDB); the builder writes the container's own `db` / `db` / `db` on the host `db` into the app's `.env`, as the tool writes nothing for a `php` project |
 | Getting the code | `wp core download` | `composer create-project codeigniter4/appstarter`, in the web container |
 | Install | `wp core install` | `spark migrate --all`; with `--shield`, the auth library (`composer require codeigniter4/shield`, `spark shield:setup`) and the workspace account as the first account, in the superadmin group |
 | Accounts | WP-CLI | A seeder of the auth library's user model, run by spark for the time of the call |
-| Users menu of the row | Reads the project type | Does not apply (the type is `php`): `cmd-tools-codeigniter-spark.sh --add-users`, or `cmd-tools-add-users.sh <name> codeigniter` |
+| Users menu of the row | Reads the project type | On DDEV it does not apply (the type is `php`): `cmd-tools-codeigniter-spark.sh --add-users`, or `cmd-tools-add-users.sh <name> codeigniter`. On another runtime the plugin's claim gives the row the list (see [Runtimes](#runtimes)) |
 
 ## The commands
 
@@ -107,15 +108,69 @@ bash cmd-codeigniter-project.sh myapp --install --add-users --shield
 | `--add-users` | With `--install` and `--shield`: add the default accounts |
 | `--production` | Run the app as a live app runs: `CI_ENVIRONMENT = production` (the plain error pages instead of the debug page, no debug toolbar). Without it the app runs in development |
 | `--php-version <x>` | The PHP of the project container |
+| `--runtime <name>` | The container runtime to build on: `ddev` (the default), `docker`, `kubernetes`, `podman`, `lando` or `docksal`. See [Runtimes](#runtimes) |
 | `--launch` | Open the app when it is ready |
 
-The app answers at `https://myapp.ddev.site`, the login (with `--shield`) at `/login`, its mail
+On DDEV the app answers at `https://myapp.ddev.site`, the login (with `--shield`) at `/login`, its mail
 catcher at `https://myapp.ddev.site:8026`. The build runs `ddev config --project-type=php
 --docroot=public` with the Node.js of the workspace (24), makes the app from the official app
 starter with Composer in the web container, and writes its `.env`: the address, the container's
 own database settings and the sender of its mail (the app sends through the web container's
 sendmail, which the container tool hands to its mail catcher). A project of the same name is
 deleted first.
+
+
+### Runtimes
+
+```bash
+bash cmd-codeigniter-project.sh myapp --shield --install --add-users                        # DDEV, the default
+bash cmd-codeigniter-project.sh myapp --shield --install --add-users --runtime docker       # Docker Compose
+bash cmd-codeigniter-project.sh myapp --shield --install --add-users --runtime kubernetes   # a Kubernetes cluster
+bash cmd-codeigniter-project.sh myapp --shield --install --add-users --runtime lando        # Lando
+bash cmd-codeigniter-project.sh myapp --shield --install --add-users --runtime docksal      # Docksal
+```
+
+Without `--runtime` a build takes `container.runtime` of the workspace's `settings.yml`, then DDEV.
+It needs a Webship Workspace with the container runtimes
+([webship/workspace#694](https://github.com/webship/workspace/issues/694)); on an older one the
+builder refuses `--runtime` and builds on DDEV only. Lando and Docksal need a Workspace whose runtime
+layer has them ([webship/workspace#729](https://github.com/webship/workspace/issues/729),
+[#730](https://github.com/webship/workspace/issues/730)).
+
+| | DDEV | Docker Compose | Kubernetes | Podman | Lando | Docksal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Build with `--shield --install --add-users --production` | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The pages, and a login as the workspace account and the default accounts (`banned` refused) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| `cmd-tools-codeigniter-spark.sh`: status, `--run`, the accounts | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Test users, added and cancelled | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Mail caught by Mailpit (the auth library's login link) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The testing setup and the first feature | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The step pack's examples (49 scenarios) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Export and import the database | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The row in the dashboard, and remove | Yes | Yes | Yes | Not yet run | Yes | Yes |
+
+"Yes" means it was run on a real app of that runtime. Podman runs the same code as Docker Compose
+and was not run yet.
+
+| Runtime | The app's address | What the project carries |
+| --- | --- | --- |
+| DDEV | `https://myapp.ddev.site` | `.ddev/config.yaml` |
+| Docker Compose | `http://127.0.0.1:<port>`, printed by the build | `compose.yaml`, `.webship/runtime/Dockerfile` |
+| Kubernetes | `http://<node address>:<port>`, printed by the build | The same, and `k8s/` (the namespace `ws-myapp`) |
+| Lando | `http://127.0.0.1:<port>`, printed by the build | `.lando.yml` (Lando's proxy stays off) |
+| Docksal | `http://myapp.docksal.site`, on Docksal's own proxy | `.docksal/docksal.env`, `.docksal/docksal.yml` |
+
+What differs on Docker Compose, Kubernetes, Lando and Docksal:
+
+- **The claim:** the project type is `php` there too, which says nothing of the platform, so the builder writes `platform: codeigniter` in the `x-webship:` block of the project (the core's `rt_claim`). The tools read it, and the row's Tests menu offers the plugin's test users through it. On DDEV the builder writes no claim, as before: the app is known by its files, and the row has no test users.
+- **The address** in the app's `.env` (`app.baseURL`) is the runtime's. The rest of `.env` is the same on every runtime: `db` / `db` / `db` on the host `db`, and PHP's own mail, which each runtime hands to its mail catcher.
+- **`composer create-project`** is told the project root (`.`), as DDEV takes it.
+- **The web server** is Apache; the app starter ships the `public/.htaccess` it needs.
+- **HTTPS and a host name** are DDEV's: a runtime's address is plain HTTP.
+
+The same commands work on every runtime: `cmd-tools-codeigniter-spark.sh`, `cmd-tools-add-users.sh`,
+`cmd-tools-testing.sh`. The pattern is the Workspace's
+[`core/docs/plugins-on-runtimes.md`](https://github.com/webship/workspace/blob/1.0.x/core/docs/plugins-on-runtimes.md).
 
 ### Work on an app
 
