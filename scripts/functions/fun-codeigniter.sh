@@ -12,6 +12,15 @@
 # database settings for a php project, so the builder writes the container's own values (db, db, db
 # on the host db) into the app's .env, and nothing personal.
 #
+# The runtimes: an app is built on DDEV, or with --runtime on Docker Compose, Podman, Kubernetes, Lando
+# or Docksal. The commands are the same on each: `ddev <verb>` is DDEV itself on a DDEV project, and on
+# another runtime the core's layer (fun-runtime.sh) gives the verb its meaning there. What differs is
+# behind codeigniter_runtime: the address (codeigniter_url), the claim of the plugin on the project
+# (rt_claim: the project type is php, which says nothing of the platform, so that is how an app of
+# another runtime is known), and the folder `composer create-project` makes the app in (DDEV takes the
+# project root, the layer is told "."). The .env is the same on every runtime: the stack's database is
+# db, db, db on the host db there too, and PHP's mail goes to its mail catcher.
+#
 # Four names are the ones the core's tools look for:
 #   set_codeigniter_users          the default accounts            (cmd-tools-add-users.sh <project> codeigniter)
 #   add_codeigniter_users          create them through the app     (the same tool, and --add-users of the builder)
@@ -45,10 +54,26 @@ function set_codeigniter_users() {
   user_banned_state='banned' ;
 }
 
-# Is this folder a CodeIgniter project? A container project whose app has the spark script of the
-# framework and its app/Config/Paths.php.
+# The runtime of the project in this folder, or of a new build (--runtime, else the workspace's
+# setting, else DDEV). A core without the runtime layer has DDEV only.
+function codeigniter_runtime() {
+  if declare -f runtime_of > /dev/null ; then runtime_of ; else echo 'ddev' ; fi
+}
+
+# The address of the app in this folder: https://<name>.ddev.site on DDEV, http://127.0.0.1:<port> on
+# Docker Compose, Podman and Lando, the node's address and a port on Kubernetes, http://<name>.docksal.site
+# on Docksal. Asked after `ddev config`.
+function codeigniter_url() {
+  if declare -f rt_url > /dev/null ; then rt_url ; else echo "https://${PROJECT_NAME}.ddev.site" ; fi
+}
+
+# Is this folder a CodeIgniter project? On Docker Compose, Podman, Kubernetes, Lando and Docksal the
+# claim of the plugin says so (`platform: codeigniter` in the x-webship block, written by the builder:
+# the core's rt_is_platform reads it). On DDEV, whose project type for it is php, a container project
+# whose app has the spark script of the framework and its app/Config/Paths.php, as before.
 function codeigniter_is_project() {
   local project_path="$1";
+  if declare -f rt_is_platform > /dev/null && rt_is_platform "${project_path}" codeigniter ; then return 0 ; fi
   [ -f "${project_path}/.ddev/config.yaml" ] && [ -f "${project_path}/app/Config/Paths.php" ] \
     && grep -q 'CodeIgniter' "${project_path}/spark" 2>/dev/null ;
 }
@@ -66,7 +91,7 @@ function codeigniter_enter_project() {
     return 1 ;
   fi
   if ! codeigniter_is_project "${project_path}" ; then
-    echo "${doc_name}/${PROJECT_NAME} is not a CodeIgniter project (it has no spark script and app/Config/Paths.php of the framework)." ;
+    echo "${doc_name}/${PROJECT_NAME} is not a CodeIgniter project (it has no spark script and app/Config/Paths.php of the framework, and no plugin claims it)." ;
     return 1 ;
   fi
   cd "${project_path}" || return 1 ;
@@ -174,7 +199,12 @@ PHPEOF
 # the auth library with --shield, and with --install its database and its first account.
 function codeigniter_build() {
   trim_project_name ;
-  local base_url="https://${PROJECT_NAME}.ddev.site" ;
+  local base_url runtime ;
+  runtime="$(codeigniter_runtime)" ;
+  if [ "${RUNTIME:-_none_}" != '_none_' ] && [ "${RUNTIME}" != "${runtime}" ] ; then
+    echo "--runtime ${RUNTIME} needs a Webship Workspace with the container runtimes (webship/workspace#694): update the workspace, or build on DDEV." ;
+    exit 1 ;
+  fi
   local php_version="${PHP_VERSION:-${site_php_version:-}}" ;
   local environment='development' ;
   [ "${PRODUCTION}" == 'yes' ] && environment='production' ;
@@ -189,10 +219,20 @@ function codeigniter_build() {
   # DDEV has no project type for the framework: php, with the public docroot of the app starter.
   ddev config --project-type=php --docroot="${distribution_webroot}" --project-name=${PROJECT_NAME} \
     --nodejs-version=$(ddev_nodejs_version) ${php_version:+--php-version=${php_version}} --auto || exit 1 ;
+  # On another runtime than DDEV the plugin claims the project, so the tools and the dashboard know it
+  # is a CodeIgniter app (the type php says nothing of the platform).
+  if [ "${runtime}" != 'ddev' ] ; then
+    rt_claim codeigniter || exit 1 ;
+  fi
+  # The address is the runtime's to say, once the project is configured: never a written ddev.site.
+  base_url="$(codeigniter_url)" ;
   ddev_up start -y || exit 1 ;
 
-  # The official app starter, with Composer in the web container.
-  ddev composer create-project codeigniter4/appstarter --no-interaction \
+  # The official app starter, with Composer in the web container. DDEV makes it in the project root;
+  # the layer of another runtime is told so (".").
+  local into='' ;
+  [ "${runtime}" != 'ddev' ] && into='.' ;
+  ddev composer create-project codeigniter4/appstarter ${into} --no-interaction \
     || { echo "composer create-project codeigniter4/appstarter failed." ; exit 1 ; } ;
   codeigniter_write_env "${base_url}" ;
 
@@ -325,7 +365,7 @@ function codeigniter_spark_tool() {
     set_codeigniter_users ;
     cancel_codeigniter_users ;
   else
-    echo "${doc_name}/${PROJECT_NAME}: CodeIgniter $(ddev exec php spark --version 2>/dev/null | grep -o 'v[0-9][0-9.]*' | head -1) at https://${PROJECT_NAME}.ddev.site" ;
+    echo "${doc_name}/${PROJECT_NAME}: CodeIgniter $(ddev exec php spark --version 2>/dev/null | grep -o 'v[0-9][0-9.]*' | head -1) at $(codeigniter_url)" ;
     echo "  Environment: $(grep -E '^[[:space:]]*CI_ENVIRONMENT[[:space:]]*=' .env 2>/dev/null | head -1 | sed -E 's/.*=[[:space:]]*//')" ;
     if codeigniter_has_shield ; then
       echo "" ; echo "Accounts:" ;

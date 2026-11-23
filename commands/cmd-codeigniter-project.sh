@@ -4,8 +4,9 @@
 
 # Installed by the CodeIgniter plugin (plugins.sh --install codeigniter); __WORKSPACE__ is the workspace it was installed into.
 #
-# Build a CodeIgniter app in a container from the official app starter, at https://<name>.ddev.site
-# (DDEV project type php, docroot public). With --shield it gets the official auth library, set up by
+# Build a CodeIgniter app in a container from the official app starter (project type php, docroot
+# public): on DDEV (the default) at https://<name>.ddev.site, or with --runtime docker, podman,
+# kubernetes, lando or docksal on that runtime, at the address the build prints. With --shield it gets the official auth library, set up by
 # its own command, with CSRF protection on for every form; with --install its database is migrated and
 # the workspace account is its first account; with --add-users it also gets the default accounts.
 
